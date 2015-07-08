@@ -1,6 +1,6 @@
 *.csv
 in/*
 out/*
-doc/*
+docs/*
 #$
 ~$
