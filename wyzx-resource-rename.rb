@@ -52,7 +52,11 @@
 require 'csv'
 require 'FileUtils'
 
+
+
 module WyzxRename
+
+	@debug = true
 
 	extend self
 
@@ -62,30 +66,38 @@ module WyzxRename
 		@book = normalize_str h[:book]
 		@unit = normalize_str h[:unit]
 		@type = normalize_str h[:type]
-		@newdir = File.join @out, @type, "book_#{@book}" , "unit_#{@unit}", @filename
-		mkdir_if_not_exist @newdir
-		p @newdir
+
+
+		@newdir = assemble_new_dir
+		o_fn = File.join @in, @filename
+		n_fn = assemble_new_filename
+		# copy_to_new_folder o_fn, File.join(@newdir, n_fn)
+
+		p @newdir if @debug
 	end
 
 	def normalize_str(s)
 		s.strip.downcase
 	end
 
-	def assemble_new_dir(h)
+	def assemble_new_dir
+		File.join @out, @type, "book_#{@book}" , "unit_#{@unit}", @filename
 	end
 
-	def assemble_new_filename(h)
+	def assemble_new_filename
+		'to do'
 	end
 
 	def normalize_filename(s)
 	end
 
-	def mkdir_if_not_exist(dir)
-		FileUtils.mkdir_p dir unless File.exist? dir
+	def mkdir_if_not_exist
+		FileUtils.mkdir_p @newdir unless File.exist? @newdir
 	end
 
-	def copy_to_new_folder(orig_filename, new_filename)
-		FileUtils.cp orig_filename, new_filename
+	def copy_to_new_folder(o, n)
+		mkdir_if_not_exist
+		FileUtils.cp o, n
 	end
 
 end
