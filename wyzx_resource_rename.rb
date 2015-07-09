@@ -50,6 +50,7 @@
 
 require 'csv'
 require 'FileUtils'
+require 'did_you_mean'
 
 # namespace
 module WyzxRename
