@@ -1,4 +1,6 @@
 *.xlsx
+*.xls
+*.swp
 *.csv
 Gemfile.lock
 in/*
