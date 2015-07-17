@@ -58,7 +58,7 @@
 
 require 'csv'
 require 'FileUtils'
-require 'did_you_mean'
+# require 'did_you_mean'
 
 # namespace
 module WyzxRename
@@ -134,6 +134,7 @@ end
 
 def main(csv, in_dir, out_dir)
   p "输入目录是 #{in_dir}。输出目录是 #{out_dir}"
+
   # 默认的converters: numeric 我们要的就是字符而不是数字
   CSV.table(csv, converters: nil).each do |e|
     WyzxRename.go e, in_dir, out_dir
