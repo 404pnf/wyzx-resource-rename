@@ -2,7 +2,7 @@
 #
 #   ruby script.rb csv文件 输入文件夹 输出文件夹
 #
-# ## csv格式例子：
+# ## csv格式举例：
 #
 # fn, book, unit, type
 #
@@ -39,15 +39,6 @@
 #
 # 举例： a.jpg 使用了两次，两次使用时用了不同的名字 b2_u1_a.jpg, b3_u2_b.jpg
 #
-#
-# 对应的excel是
-#
-# fn, book, unit, type
-#
-# a.jpg, 2, 1, pic
-#
-# a.jpg, 3, 2, pic
-
 ## 实际csv举例
 #
 # Unit,Section,Sub-section,Task,Activity / Step,Question,原文件名,新文件名
@@ -67,46 +58,29 @@
 
 require 'csv'
 require 'FileUtils'
-# require 'did_you_mean'
+require 'did_you_mean'
 
 # namespace
 module WyzxRename
   module_function
 
-  # >> db.headers
-  # => [:unit, :section, :subsection, :task, :activity_step, :question, :orig_filename, :new_filename]
+  # >> csv headers
+  # => [:book, :type, :unit, :section, :subsection, :task, :activity_step, :question, :orig_filename, :new_filename]
   def go(h, in_dir, out_dir)
-    # 清理csv中的字符串
-    h = h.each_with_object({}) do |(k, v), a|
-      if k == :orig_filename  # 原始文件名不应该改变，否则它也变成只剩数字了
-        a[k] = v.strip
-      else
-        a[k] = normalize_str(v)
-      end
-    end
-    unit =  h[:unit]
-    section = h[:section]
-    subsection =  h[:subsection]
-    task =  h[:task]
-    activity_step =  h[:activity_step]
-    question =  h[:question]
-    orig_filename = h[:orig_filename]
+    h = h.each_with_object({}) { |(k, v), a| a[k] = normalize_str(v) }
+    book, type, unit, section, subsection, task, activity_step, question, orig_filename = h.values
     suffix = File.extname(orig_filename)
 
+    # system("mkdir in; cd in; touch #{orig_filename}")
     # 根据规则拼出新的文件名
     new_fn_arr = [unit, section, subsection, task, activity_step, question]
-    # 如果文件末尾连续出现空的层级，在新文件名中忽略它们
-    # 借用数组的drop_while
-    # >> a = [ ' ', ' ', 'ab']
-    # => [" ", " ", "ab"]
-    # >> a.drop_while { |e| e == ' ' }
-    # => ["ab"]
     new_fn_without_suffix = assemble_new_filename(new_fn_arr)
     new_filename = "#{new_fn_without_suffix}#{suffix}"
-    p new_filename
 
-    orig_file_with_path = File.join in_dir, orig_filename
-    new_file_with_path = File.join out_dir, new_filename
+    newdir = File.join out_dir, "book_#{book}", type, "unit_#{unit}"
+    mkdir_if_not_exist(newdir)
+
+    copy_to_new_folder File.join(in_dir, orig_filename), File.join(newdir, new_filename)
   end
 
   # 清理csv中的字符串
@@ -121,19 +95,30 @@ module WyzxRename
   # case D: 需要保留 3a 3b 这种的a和b
   def normalize_str(s)
     s ||= ''
-    ss = s.match(/\d[0-9a-z]*/).to_s # 匹配 1, 12, 1a, 1abc
-    if ss.strip == ''
-      ' '
+    if s == ''
+      false
     else
-      ss.strip
+      s.strip
     end
+    # ss = s.match(/\d[0-9a-z]*/).to_s # 匹配 1, 12, 1a, 1abc
+    # if ss.strip == ''
+    #   ' '
+    # else
+    #   ss.strip
+    # end
   end
 
   def assemble_new_filename(arr)
+    # 如果文件末尾连续出现空的层级，在新文件名中忽略它们
+    # 借用数组的drop_while
+    # >> a = [ ' ', ' ', 'ab']
+    # => [" ", " ", "ab"]
+    # >> a.drop_while { |e| e == ' ' }
+    # => ["ab"]
     arr.reverse
-      .drop_while { |e| e == ' ' }
+      .drop_while(&:!)
       .reverse
-      .map { |e| e == ' ' ? 0 : e } # 中间层级为空，补0
+      .map { |e| e ? e : 0 } # 中间层级为空，补0
       .join('_')
   end
 
@@ -142,6 +127,7 @@ module WyzxRename
   end
 
   def copy_to_new_folder(o, n)
+    p "将文件 #{o} 复制到 #{n}"
     FileUtils.cp o, n
   end
 end
@@ -152,6 +138,8 @@ def main(csv, in_dir, out_dir)
   CSV.table(csv, converters: nil).each do |e|
     WyzxRename.go e, in_dir, out_dir
   end
+
+  p "运行完了，请查看 #{out_dir} 目录中内容"
 end
 
 main ARGV[0] || 'rename.csv', ARGV[1] || 'in', ARGV[2] || 'out'
