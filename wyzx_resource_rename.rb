@@ -71,7 +71,9 @@ module WyzxRename
     book, type, unit, section, subsection, task, activity_step, question, orig_filename = h.values
     suffix = File.extname(orig_filename)
 
+    # 生成测试数据
     # system("mkdir in; cd in; touch #{orig_filename}")
+
     # 根据规则拼出新的文件名
     new_fn_arr = [unit, section, subsection, task, activity_step, question]
     new_fn_without_suffix = assemble_new_filename(new_fn_arr)
@@ -94,26 +96,20 @@ module WyzxRename
   # case C: csv内容有多余的注释内容 Listening to the world (2), 只保留数字
   # case D: 需要保留 3a 3b 这种的a和b
   def normalize_str(s)
-    s ||= ''
-    if s == ''
+    s ||= '' # 处理s是nil的情况
+    if s.strip == ''
       false
     else
       s.strip
     end
     # ss = s.match(/\d[0-9a-z]*/).to_s # 匹配 1, 12, 1a, 1abc
-    # if ss.strip == ''
-    #   ' '
-    # else
-    #   ss.strip
-    # end
   end
 
   def assemble_new_filename(arr)
     # 如果文件末尾连续出现空的层级，在新文件名中忽略它们
     # 借用数组的drop_while
-    # >> a = [ ' ', ' ', 'ab']
-    # => [" ", " ", "ab"]
-    # >> a.drop_while { |e| e == ' ' }
+    # >> a = [ false, false, 'ab']
+    # >> a.drop_while(&:!)
     # => ["ab"]
     arr.reverse
       .drop_while(&:!)
