@@ -1,5 +1,6 @@
 require "csv"
 require "dir"
+# require 'file'
 
 module Rename
   extend self
@@ -10,21 +11,50 @@ module Rename
     header = csv[0]
     data = csv[1..csv.length]
     row_with_header = data.map { |e| header.zip(e).to_h }
+    # puts row_with_header
     row_with_header.each do |e|
       process(e)
     end
   end
 
-  Dir.mkdir_p("a/b/c") unless Dir.exists?("a/b/c")
+  def report_missing_files(arr)
+    arr.each do |e|
+      puts "没有找到这个文件：#{e}。"
+    end
+    puts "请解决上述问题后再运行本工具。"
+  end
+
+  # Dir.mkdir_p("a/b/c") unless Dir.exists?("a/b/c")
 
   def process(hsh)
     out_dir = "out"
     in_dir = "in"
+    type_name = {
+      ".jpg" => "image",
+      ".jpeg" => "image",
+      ".png" => "image",
+      ".mp3" => "audio",
+      ".mp4" => "video"
+    }
+
     h = sanitize_data(hsh)
     book, type, unit, section, subsection, task, activity_step, question, orig_filename = h.values
-    suffix = File.extname(orig_filename)
+
     # 生成测试数据
     # system("mkdir in; cd in; touch #{orig_filename}")
+
+    suffix = File.extname(orig_filename)
+    unless type_name.has_key?(suffix)
+      raise "
+
+        OMG。不知道这个后缀代表什么类型： #{suffix.downcase} 。
+        请检查是否为拼写错误并修改一下吧。
+
+        "
+    end
+
+    # 从文件后缀判断类习惯。该类型是组成新文件所在目录的元素之一。
+    type = type_name[suffix.downcase]
 
     # 根据规则拼出新的文件名
     new_fn_arr = [unit, section, subsection, task, activity_step, question]
@@ -36,6 +66,16 @@ module Rename
 
     old_file_fullpath = File.join in_dir, orig_filename
     new_file_fullpath = File.join newdir, new_filename
+
+    unless File.exists?(old_file_fullpath)
+      raise "
+
+        OMG。没找到这个文件： #{orig_filename} 。
+        请检查是否为拼写错误并修改一下吧。
+
+        "
+    end
+
     file_copy(old_file_fullpath, new_file_fullpath)
   end
 
