@@ -4,13 +4,10 @@
 #
 # ## csv格式举例：
 #
-# fn, book, unit, type
-#
-# a.jpg, 2, 1, pic
-#
-# b.mp4, 6, 2, video
-#
-# c.mp3, 3, 4, audio
+#       fn, book, unit, type
+#       a.jpg, 2, 1, pic
+#       b.mp4, 6, 2, video
+#       c.mp3, 3, 4, audio
 #
 # ## 工具行为
 #
@@ -26,11 +23,9 @@
 #
 # 上面csv中的例子在输出文件夹中会是类似如下的形式
 #
-# "out/audio/book_3/unit_4/c.mp3"
-#
-# "out/video/book_6/unit_4/b.mp4"
-#
-# "out/pic/book_2/unit_1/a.jpg"
+#     "out/audio/book_3/unit_4/c.mp3"
+#     "out/video/book_6/unit_4/b.mp4"
+#     "out/pic/book_2/unit_1/a.jpg"
 #
 #
 # ## 注意
@@ -39,7 +34,7 @@
 #
 # 举例： a.jpg 使用了两次，两次使用时用了不同的名字 b2_u1_a.jpg, b3_u2_b.jpg
 #
-## 实际csv举例
+# ## 实际csv举例
 #
 #      "book","Unit","Section","Sub-section","Task","Activity Step","Question","orig_filename"
 #      1,1,2,1,1,,,"U1_1_1.mp4"
@@ -50,11 +45,12 @@
 #      1,1,2,1,"3c",,,"u1_2.1.3_c.jpg"
 #
 # ## 规则补充
-##
-# 说明： 1 基于新视野视听说的层级分析，Section和Sub-section对应的层级数字是固定的，具体可见各Section和Sub-section标题文字后的数字。
-#       1 如果文件名中出现某一个中间层级为空的情况，那么该层级的数字表现为0
-#       1 如果文件末尾连续出现空的层级，在新文件名中忽略它们
-#       1 如果某层级有多个同级别的文件时，则用a、b等英文字母来区别
+#
+# 说明：
+# 1. 基于新视野视听说的层级分析，Section和Sub-section对应的层级数字是固定的，具体可见各Section和Sub-section标题文字后的数字。
+# 1. 如果文件名中出现某一个中间层级为空的情况，那么该层级的数字表现为0
+# 1. 如果文件末尾连续出现空的层级，在新文件名中忽略它们
+# 1. 如果某层级有多个同级别的文件时，则用a、b等英文字母来区别
 
 require 'csv'
 require 'FileUtils'
@@ -64,9 +60,7 @@ require 'FileUtils'
 
 # namespace
 module WyzxRename
-  # extend self
-
-  @debug = true
+  @debug = false
   TYPE = {
     '.jpg' => 'image',
     '.jpeg' => 'image',
@@ -86,7 +80,7 @@ module WyzxRename
     d1 = add_input_output_dir d, in_dir, out_dir
     data = add_extra_id d1
     orig_files = data.map { |e| File.join e[:in_dir], e[:orig_filename] }
-    # exit if find_missing_files(orig_files) || check_suffix(orig_files)
+    exit if find_missing_files(orig_files) || check_suffix(orig_files)
     data.each { |e| go e }
     puts "\nDone. Check #{out_dir} directory.\n\n"
   end
@@ -100,23 +94,22 @@ module WyzxRename
   end
 
   # keys of csv
-  # book unit section subsection task activity_step question #
-  # 还需要加上suffix作为键
+  # book unit section subsection task activity_step question #\
+  # 还需要加上suffix作为键。
   # 否则会误判级别一样但不是同一类型文件的两个文件为重名啦。
   #
   # 误判举例
   #
-  # 下面几个文件有相同的级别层次，该级别为 1_1_4_2_1
-  # ["1", "1", "4", "2", "1", nil, nil, nil]
-  # "U1_3_3_1.mp3"
-  # "u1_4.2.1_1.jpg"
+  #     下面几个文件有相同的级别层次，该级别为 1_1_4_2_1
+  #     ["1", "1", "4", "2", "1", nil, nil, nil]
+  #     "U1_3_3_1.mp3"
+  #     "u1_4.2.1_1.jpg"
   #
   # 如果某个键出现了多个文件，那么直接根据现有规则重命名就会出现重名的情况，
   # 我们去给相同键下的这些记录一次增加一个extra_id，从'1'开始。
-  # 可用 each_with_index。
-  # 或者将数字转为字母。
+  # 可用 each_with_index，再将数字转为字母。
   def add_extra_id(d)
-    # 不用小写 l 因为和 1 太像了
+    # number2id 中    不用小写 l 因为和 1 太像了
     number2id = [[1, 'a'], [2, 'b'], [3, 'c'], [4, 'd'],
                 [5, 'e'], [6, 'f'], [7, 'g'], [8, 'h'],
                 [9, 'i'], [10, 'j'], [11, 'k'], [12, 'm'], [13, 'n']].to_h
@@ -126,11 +119,11 @@ module WyzxRename
       k.push suffix
     end
     extra = dd.select { |_, v| v.size > 1 }
-    p extra.size if @debug
+    puts extra.size if @debug
     extra.each do |k, v|
       puts "\n下面几个文件有相同的级别层次，该级别为 #{k.join('_').gsub(/_+$/, '')} " if @debug
       p k if @debug
-      v.each { |e| p e[:orig_filename] }
+      v.each { |e| p e[:orig_filename] if @debug }
     end
     with_id = extra.each do |k ,v|
       v.each_with_index do |e, i|
@@ -141,7 +134,7 @@ module WyzxRename
     db = dd.merge(with_id)
          .values
          .reduce([]) { |a, e| a.concat e }
-    p db.size if @debug
+    puts db.size if @debug
     db
   end
 
@@ -180,12 +173,12 @@ module WyzxRename
   # 如果check_suffix发现了错误并嗲用了report_error，则程序退出。
   def report_error(msg, a)
     puts msg
-    a.each { |e| puts e }
+    a.each { |e| puts "      #{e}" }
     true
   end
 
-  # >> csv headers
-  # => [:book, :type, :unit, :section, :subsection, :task, :activity_step, :question, :orig_filename, :new_filename]
+  #      >> csv headers
+  #      => [:book, :type, :unit, :section, :subsection, :task, :activity_step, :question, :orig_filename, :new_filename]
   # 生成测试数据
   # system("mkdir in; cd in; touch #{@orig_filename}")
   def go(h)
@@ -206,15 +199,8 @@ module WyzxRename
   end
 
   # 清理csv中的字符串
-  # 1. 删除收尾多余空格
+  # 1. 删除首尾多余空格
   # 2. 转换nil
-  # 3. 判断去除多余空格后是否为空
-  # 4. 从文本中捕获数字和3a这种文本
-  #
-  # case A: csv内容为空是，会解析为nil，将nil转为一个空格
-  # case B: csv内容只是一些空格，我们也应该先清除这些空格看看是否有实际内容。没有的话，将其设定为一个空格。
-  # case C: csv内容有多余的注释内容 Listening to the world (2), 只保留数字
-  # case D: 需要保留 3a 3b 这种的a和b
   def normalize_str(s)
     s ||= '' # 处理s是nil的情况
     if s.strip == ''
@@ -222,14 +208,13 @@ module WyzxRename
     else
       s.strip
     end
-    # ss = s.match(/\d[0-9a-z]*/).to_s # 匹配 1, 12, 1a, 1abc
   end
 
-  # 如果文件末尾连续出现空的层级，在新文件名中忽略它们
-  # 借用数组的drop_while
-  # >> a = [ false, false, 'ab']
-  # >> a.drop_while(&:!)
-  # => ["ab"]
+  # 如果文件末尾连续出现空的层级，在新文件名中忽略它们。
+  # 借用数组的drop_while。
+  #       >> a = [ false, false, 'ab']
+  #       >> a.drop_while(&:!)
+  #       => ["ab"]
   def assemble_new_filename
     arr = [@book, @unit, @section, @subsection, @task, @activity_step, @question]
     s = arr.reverse
@@ -250,8 +235,8 @@ module WyzxRename
   end
 
   def copy_to_new_folder(o, n)
-    # p "将文件 #{o} 复制到 #{n}"
-    # FileUtils.cp o, n
+    p "将文件 #{o} 复制到 #{n}"
+    FileUtils.cp o, n
   end
 end
 
