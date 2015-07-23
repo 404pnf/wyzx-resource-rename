@@ -41,16 +41,16 @@
 #
 ## 实际csv举例
 #
-# Unit,Section,Sub-section,Task,Activity / Step,Question,原文件名,新文件名
+#      "book","Unit","Section","Sub-section","Task","Activity Step","Question","orig_filename"
+#      1,1,2,1,1,,,"U1_1_1.mp4"
+#      1,1,2,1,2,,,"U1_1_1b.mp4"
+#      1,1,2,1,3,,,"U1_1_1c.mp4"
+#      1,1,2,1,"3a",,,"u1_2.1.3_a.jpg"
+#      1,1,2,1,"3b",,,"u1_2.1.3_b.jpg"
+#      1,1,2,1,"3c",,,"u1_2.1.3_c.jpg"
 #
-# 1,Listening to the world (2),Sharing (1),1,,,U1_1_1.mp4,u1_2.1.1.mp4
-#
-# 1,Listening to the world (2),Sharing (1),2,,,,
-#
-# 1,Listening to the world (2),Sharing (1),3,,,,
-
 # ## 规则补充
-#
+##
 # 说明： 1 基于新视野视听说的层级分析，Section和Sub-section对应的层级数字是固定的，具体可见各Section和Sub-section标题文字后的数字。
 #       1 如果文件名中出现某一个中间层级为空的情况，那么该层级的数字表现为0
 #       1 如果文件末尾连续出现空的层级，在新文件名中忽略它们
@@ -60,109 +60,149 @@ require 'csv'
 require 'FileUtils'
 # require 'did_you_mean'
 
+
+
 # namespace
 module WyzxRename
-  extend self
+  # extend self
 
+  @debug = true
+  TYPE = {
+    '.jpg' => 'image',
+    '.jpeg' => 'image',
+    '.png' => 'image',
+    '.mp3' => 'audio',
+    '.mp4' => 'video'
+  }
+
+  module_function
+
+  # 默认的converters: numeric 我们要的就是字符而不是数字
+  # 将in_dir和out_dir也放到数据中，方便后面使用。
   def main(csv, in_dir, out_dir)
-
     puts "\nInput dir is #{in_dir}. Output dir is #{out_dir}\n\n"
-
-    # 默认的converters: numeric 我们要的就是字符而不是数字
-    data = CSV.table(csv, converters: nil)
-    # 直接将 original_fileanme 修改为带着目录的，否则后面代码都需要传in_dir
-    # 并拼完整目录
-    data.map { |e| e[:orig_filename] = File.join in_dir, e[:orig_filename]}
-
-    find_missing_files(data)
-    check_suffix(data)
-
-    data.each do |e|
-      # WyzxRename.go e, in_dir, out_dir
-    end
-
+    d = CSV.table(csv, converters: nil).map(&:to_h)
+    puts d[0].keys if @debug
+    d1 = add_input_output_dir d, in_dir, out_dir
+    data = add_extra_id d1
+    orig_files = data.map { |e| File.join e[:in_dir], e[:orig_filename] }
+    # exit if find_missing_files(orig_files) || check_suffix(orig_files)
+    data.each { |e| go e }
     puts "\nDone. Check #{out_dir} directory.\n\n"
   end
 
+  def add_input_output_dir(d, in_dir, out_dir)
+    d.map do |e|
+      e[:in_dir] = in_dir
+      e[:out_dir] = out_dir
+      e
+    end
+  end
+
+  # keys of csv
+  # book unit section subsection task activity_step question #
+  # 还需要加上suffix作为键
+  # 否则会误判级别一样但不是同一类型文件的两个文件为重名啦。
+  #
+  # 误判举例
+  #
+  # 下面几个文件有相同的级别层次，该级别为 1_1_4_2_1
+  # ["1", "1", "4", "2", "1", nil, nil, nil]
+  # "U1_3_3_1.mp3"
+  # "u1_4.2.1_1.jpg"
+  #
+  # 如果某个键出现了多个文件，那么直接根据现有规则重命名就会出现重名的情况，
+  # 我们去给相同键下的这些记录一次增加一个extra_id，从'1'开始。
+  # 可用 each_with_index。
+  # 或者将数字转为字母。
+  def add_extra_id(d)
+    # 不用小写 l 因为和 1 太像了
+    number2id = [[1, 'a'], [2, 'b'], [3, 'c'], [4, 'd'],
+                [5, 'e'], [6, 'f'], [7, 'g'], [8, 'h'],
+                [9, 'i'], [10, 'j'], [11, 'k'], [12, 'm'], [13, 'n']].to_h
+    dd = d.group_by do |e|
+      suffix = File.extname e[:orig_filename]
+      k = e.values_at :book, :unit, :section, :subsection, :task, :activity_step, :question
+      k.push suffix
+    end
+    extra = dd.select { |_, v| v.size > 1 }
+    p extra.size if @debug
+    extra.each do |k, v|
+      puts "\n下面几个文件有相同的级别层次，该级别为 #{k.join('_').gsub(/_+$/, '')} " if @debug
+      p k if @debug
+      v.each { |e| p e[:orig_filename] }
+    end
+    with_id = extra.each do |k ,v|
+      v.each_with_index do |e, i|
+        e[:extra_id] = number2id[i + 1] # 因为number2id的键是从1开始的
+      end
+    end
+
+    db = dd.merge(with_id)
+         .values
+         .reduce([]) { |a, e| a.concat e }
+    p db.size if @debug
+    db
+  end
+
   def find_missing_files(a)
-    files = a.map { |e| e[:orig_filename]}
-
-    # 找到csv文件中有但目录中不存在的文件。
-    # 块作用域。参加ruby基础教程第4版 148页
-    missing_files = files
-      .map { |e |       [File.exist?(e), e]}
-      . tap { |e|  }
-      .select { |e| e[0] == false}
-      .map { |e| e[1] }
-
+    missing_files = a.map { |e | [File.exist?(e), e] }
+                    .select { |e| e[0] == false }
+                    .map { |e| e[1] }
     msg = <<-EOF
-
-      =======================
-      Please fix these errors.
+      ========================
       Missing following files:
       ========================
-
     EOF
-
     report_error(msg, missing_files) unless missing_files.empty?
   end
 
   def check_suffix(a)
-    type_name = {
-      ".jpg" => "image",
-      ".jpeg" => "image",
-      ".png" => "image",
-      ".mp3" => "audio",
-      ".mp4" => "video"
-    }
-    files = a.map { |e| e[:orig_filename]}
-    wrong_suffix = files
-      .map { |e| [type_name[File.extname e], e]}
-      .select { |e| e[0] == nil }
-      .map { |e| e[1] }
-
+    wrong_suffix = a.map { |e| e[:orig_filename] }
+                   .map { |e| [self::TYPE[File.extname e], e] }
+                   .select { |e| e[0].nil? }
+                   .map { |e| e[1] }
     msg = <<-EOF
-
       =============================
-      Please fix these errors.
       Wrong suffix. Check spelling?
       =============================
-
     EOF
-
     report_error(msg, wrong_suffix) unless wrong_suffix.empty?
   end
 
+  # 返回 true， 表明报错函数被调用了。
+  # 方便之前的函数知道到底有没有错误发现错误并报告给用户。
+  # 举例：
+  #
+  #     status = check_suffix(a)
+  #     exit if status
+  #
+  # 如果check_suffix发现了错误并嗲用了report_error，则程序退出。
   def report_error(msg, a)
     puts msg
     a.each { |e| puts e }
-    exit
+    true
   end
 
   # >> csv headers
   # => [:book, :type, :unit, :section, :subsection, :task, :activity_step, :question, :orig_filename, :new_filename]
-  def go(h, in_dir, out_dir)
-
-
+  # 生成测试数据
+  # system("mkdir in; cd in; touch #{@orig_filename}")
+  def go(h)
     h = h.each_with_object({}) { |(k, v), a| a[k] = normalize_str(v) }
+    @book, @unit, @section, @subsection, @task, @activity_step, @question,
+    @orig_filename, @in_dir, @out_dir, @extra_id = h.values_at(
+        :book, :unit, :section, :subsection, :task, :activity_step, :question,
+        :orig_filename, :in_dir, :out_dir, :extra_id
+    )
+    suffix = File.extname(@orig_filename)
+    @type = self::TYPE[suffix.downcase]
 
-    book, type, unit, section, subsection, task, activity_step, question, orig_filename = h.values
-    suffix = File.extname(orig_filename)
+    new_filename = "#{assemble_new_filename}#{suffix.downcase}"
+    newdir = File.join "book_#{@book}", "unit_#{@unit}", @type
 
-    type = type_name[suffix.downcase]
-
-    # 生成测试数据
-    # system("mkdir in; cd in; touch #{orig_filename}")
-
-    # 根据规则拼出新的文件名
-    new_fn_arr = [unit, section, subsection, task, activity_step, question]
-    new_fn_without_suffix = assemble_new_filename(new_fn_arr)
-    new_filename = "#{new_fn_without_suffix}#{suffix}"
-
-    newdir = File.join out_dir, "book_#{book}", type, "unit_#{unit}"
     mkdir_if_not_exist(newdir)
-
-    copy_to_new_folder File.join(in_dir, orig_filename), File.join(newdir, new_filename)
+    copy_to_new_folder(File.join(@in_dir, @orig_filename), (File.join newdir, new_filename))
   end
 
   # 清理csv中的字符串
@@ -185,17 +225,24 @@ module WyzxRename
     # ss = s.match(/\d[0-9a-z]*/).to_s # 匹配 1, 12, 1a, 1abc
   end
 
-  def assemble_new_filename(arr)
-    # 如果文件末尾连续出现空的层级，在新文件名中忽略它们
-    # 借用数组的drop_while
-    # >> a = [ false, false, 'ab']
-    # >> a.drop_while(&:!)
-    # => ["ab"]
-    arr.reverse
+  # 如果文件末尾连续出现空的层级，在新文件名中忽略它们
+  # 借用数组的drop_while
+  # >> a = [ false, false, 'ab']
+  # >> a.drop_while(&:!)
+  # => ["ab"]
+  def assemble_new_filename
+    arr = [@book, @unit, @section, @subsection, @task, @activity_step, @question]
+    s = arr.reverse
       .drop_while(&:!)
       .reverse
       .map { |e| e ? e : 0 } # 中间层级为空，补0
       .join('_')
+    if @extra_id
+      puts "#{@orig_filename} 的新名字是 #{s}#{@extra_id} \n\n" if @debug
+      "#{s}#{@extra_id}"
+    else
+      s
+    end
   end
 
   def mkdir_if_not_exist(newdir)
@@ -203,8 +250,8 @@ module WyzxRename
   end
 
   def copy_to_new_folder(o, n)
-    p "将文件 #{o} 复制到 #{n}"
-    FileUtils.cp o, n
+    # p "将文件 #{o} 复制到 #{n}"
+    # FileUtils.cp o, n
   end
 end
 
