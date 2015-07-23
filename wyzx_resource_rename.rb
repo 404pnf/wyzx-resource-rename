@@ -62,14 +62,94 @@ require 'FileUtils'
 
 # namespace
 module WyzxRename
-  module_function
+  extend self
+
+  def main(csv, in_dir, out_dir)
+
+    puts "\nInput dir is #{in_dir}. Output dir is #{out_dir}\n\n"
+
+    # 默认的converters: numeric 我们要的就是字符而不是数字
+    data = CSV.table(csv, converters: nil)
+    # 直接将 original_fileanme 修改为带着目录的，否则后面代码都需要传in_dir
+    # 并拼完整目录
+    data.map { |e| e[:orig_filename] = File.join in_dir, e[:orig_filename]}
+
+    find_missing_files(data)
+    check_suffix(data)
+
+    data.each do |e|
+      # WyzxRename.go e, in_dir, out_dir
+    end
+
+    puts "\nDone. Check #{out_dir} directory.\n\n"
+  end
+
+  def find_missing_files(a)
+    files = a.map { |e| e[:orig_filename]}
+
+    # 找到csv文件中有但目录中不存在的文件。
+    # 块作用域。参加ruby基础教程第4版 148页
+    missing_files = files
+      .map { |e |       [File.exist?(e), e]}
+      . tap { |e|  }
+      .select { |e| e[0] == false}
+      .map { |e| e[1] }
+
+    msg = <<-EOF
+
+      =======================
+      Please fix these errors.
+      Missing following files:
+      ========================
+
+    EOF
+
+    report_error(msg, missing_files) unless missing_files.empty?
+  end
+
+  def check_suffix(a)
+    type_name = {
+      ".jpg" => "image",
+      ".jpeg" => "image",
+      ".png" => "image",
+      ".mp3" => "audio",
+      ".mp4" => "video"
+    }
+    files = a.map { |e| e[:orig_filename]}
+    wrong_suffix = files
+      .map { |e| [type_name[File.extname e], e]}
+      .select { |e| e[0] == nil }
+      .map { |e| e[1] }
+
+    msg = <<-EOF
+
+      =============================
+      Please fix these errors.
+      Wrong suffix. Check spelling?
+      =============================
+
+    EOF
+
+    report_error(msg, wrong_suffix) unless wrong_suffix.empty?
+  end
+
+  def report_error(msg, a)
+    puts msg
+    a.each { |e| puts e }
+    exit
+  end
 
   # >> csv headers
   # => [:book, :type, :unit, :section, :subsection, :task, :activity_step, :question, :orig_filename, :new_filename]
   def go(h, in_dir, out_dir)
+
+
     h = h.each_with_object({}) { |(k, v), a| a[k] = normalize_str(v) }
+
     book, type, unit, section, subsection, task, activity_step, question, orig_filename = h.values
     suffix = File.extname(orig_filename)
+
+    type = type_name[suffix.downcase]
 
     # 生成测试数据
     # system("mkdir in; cd in; touch #{orig_filename}")
@@ -128,15 +208,4 @@ module WyzxRename
   end
 end
 
-def main(csv, in_dir, out_dir)
-  p "输入目录是 #{in_dir}。输出目录是 #{out_dir}"
-
-  # 默认的converters: numeric 我们要的就是字符而不是数字
-  CSV.table(csv, converters: nil).each do |e|
-    WyzxRename.go e, in_dir, out_dir
-  end
-
-  p "运行完了，请查看 #{out_dir} 目录中内容"
-end
-
-main ARGV[0] || 'rename.csv', ARGV[1] || 'in', ARGV[2] || 'out'
+WyzxRename.main ARGV[0] || 'rename.csv', ARGV[1] || 'in', ARGV[2] || 'out'
