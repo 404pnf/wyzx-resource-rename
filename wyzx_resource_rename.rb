@@ -56,8 +56,6 @@ require 'csv'
 require 'FileUtils'
 # require 'did_you_mean'
 
-
-
 # namespace
 module WyzxRename
   @debug = false
@@ -68,6 +66,10 @@ module WyzxRename
     '.mp3' => 'audio',
     '.mp4' => 'video'
   }
+  # NUM2ID 中    不用小写 l 因为和 1 太像了
+  NUM2ID = [[1, 'a'], [2, 'b'], [3, 'c'], [4, 'd'],
+            [5, 'e'], [6, 'f'], [7, 'g'], [8, 'h'],
+            [9, 'i'], [10, 'j'], [11, 'k'], [12, 'm'], [13, 'n']].to_h
 
   module_function
 
@@ -109,15 +111,14 @@ module WyzxRename
   # 我们去给相同键下的这些记录一次增加一个extra_id，从'1'开始。
   # 可用 each_with_index，再将数字转为字母。
   def add_extra_id(d)
-    # number2id 中    不用小写 l 因为和 1 太像了
-    number2id = [[1, 'a'], [2, 'b'], [3, 'c'], [4, 'd'],
-                [5, 'e'], [6, 'f'], [7, 'g'], [8, 'h'],
-                [9, 'i'], [10, 'j'], [11, 'k'], [12, 'm'], [13, 'n']].to_h
     dd = d.group_by do |e|
       suffix = File.extname e[:orig_filename]
-      k = e.values_at :book, :unit, :section, :subsection, :task, :activity_step, :question
+      k = e.values_at(:book, :unit, :section, :subsection,
+                      :task, :activity_step, :question
+          )
       k.push suffix
     end
+
     extra = dd.select { |_, v| v.size > 1 }
     puts extra.size if @debug
     extra.each do |k, v|
@@ -125,9 +126,10 @@ module WyzxRename
       p k if @debug
       v.each { |e| p e[:orig_filename] if @debug }
     end
-    with_id = extra.each do |k ,v|
+
+    with_id = extra.each do |_, v|
       v.each_with_index do |e, i|
-        e[:extra_id] = number2id[i + 1] # 因为number2id的键是从1开始的
+        e[:extra_id] = self::NUM2ID[i + 1] # 从1开始的
       end
     end
 
@@ -183,9 +185,11 @@ module WyzxRename
   # system("mkdir in; cd in; touch #{@orig_filename}")
   def go(h)
     h = h.each_with_object({}) { |(k, v), a| a[k] = normalize_str(v) }
-    @book, @unit, @section, @subsection, @task, @activity_step, @question,
+    @book, @unit, @section, @subsection,
+    @task, @activity_step, @question,
     @orig_filename, @in_dir, @out_dir, @extra_id = h.values_at(
-        :book, :unit, :section, :subsection, :task, :activity_step, :question,
+        :book, :unit, :section, :subsection,
+        :task, :activity_step, :question,
         :orig_filename, :in_dir, :out_dir, :extra_id
     )
     suffix = File.extname(@orig_filename)
@@ -216,12 +220,13 @@ module WyzxRename
   #       >> a.drop_while(&:!)
   #       => ["ab"]
   def assemble_new_filename
-    arr = [@book, @unit, @section, @subsection, @task, @activity_step, @question]
+    arr = [@book, @unit, @section, @subsection,
+           @task, @activity_step, @question]
     s = arr.reverse
-      .drop_while(&:!)
-      .reverse
-      .map { |e| e ? e : 0 } # 中间层级为空，补0
-      .join('_')
+        .drop_while(&:!)
+        .reverse
+        .map { |e| e ? e : 0 } # 中间层级为空，补0
+        .join('_')
     if @extra_id
       puts "#{@orig_filename} 的新名字是 #{s}#{@extra_id} \n\n" if @debug
       "#{s}#{@extra_id}"
