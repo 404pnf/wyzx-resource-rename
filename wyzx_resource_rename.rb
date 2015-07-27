@@ -2,6 +2,10 @@
 #
 #   ruby script.rb csv文件 输入文件夹 输出文件夹
 #
+# ## 默认值
+#
+# 默认csv文件名为 rename.csv 。 默认输入输出目录分别为 in, out。
+#
 # ## csv格式举例：
 #
 #       fn, book, unit, type
@@ -83,8 +87,15 @@ module WyzxRename
     data = add_extra_id d1
     orig_files = data.map { |e| File.join e[:in_dir], e[:orig_filename] }
     exit if find_missing_files(orig_files) || check_suffix(orig_files)
-    data.each { |e| go e }
+    @data = data.dup
+    data.each_with_index { |e, i| go e, i}
     puts "\nDone. Check #{out_dir} directory.\n\n"
+    p @data.first.keys
+    CSV.open("rename-#{Time.now.strftime("%Y-%m-%d")}.csv", "w", headers: @data.first.keys, force_quotes: true) do |csv|
+        @data.each do |h|
+          csv << h.delete_if { |k| [:extra_id, :in_dir, :out_dir].member? k }.values
+        end
+      end
   end
 
   def add_input_output_dir(d, in_dir, out_dir)
@@ -127,11 +138,23 @@ module WyzxRename
       v.each { |e| p e[:orig_filename] if @debug }
     end
 
+    # 这里因为mutate了e，因此，with_id才能得到改变后的值。
+    # 否则，each的语义是没有复制功能的，只不过最后返回extra本身。
+    # 碰巧把extra赋值with_id。
+    #
+    # 这里还是应该修改为reduce。
     with_id = extra.each do |_, v|
       v.each_with_index do |e, i|
         e[:extra_id] = self::NUM2ID[i + 1] # 从1开始的
       end
     end
+
+    # with_id = extra.each_with_object({}) do |(k, v), o|
+    #   vv = v.map.with_index do |e, i|
+    #     e[:extra_id] = self::NUM2ID[i + 1] # 从1开始的
+    #   end
+    #   o[k] = v
+    # end
 
     db = dd.merge(with_id)
          .values
@@ -153,8 +176,9 @@ module WyzxRename
   end
 
   def check_suffix(a)
-    wrong_suffix = a.map { |e| e[:orig_filename] }
-                   .map { |e| [self::TYPE[File.extname e], e] }
+    # ["in/U1_1_1.mp4", "in/U1_1_1b.mp4", ...
+    # p a
+    wrong_suffix = a.map { |e| [self::TYPE[File.extname e], e] }
                    .select { |e| e[0].nil? }
                    .map { |e| e[1] }
     msg = <<-EOF
@@ -183,7 +207,7 @@ module WyzxRename
   #      => [:book, :type, :unit, :section, :subsection, :task, :activity_step, :question, :orig_filename, :new_filename]
   # 生成测试数据
   # system("mkdir in; cd in; touch #{@orig_filename}")
-  def go(h)
+  def go(h, idx)
     h = h.each_with_object({}) { |(k, v), a| a[k] = normalize_str(v) }
     @book, @unit, @section, @subsection,
     @task, @activity_step, @question,
@@ -196,10 +220,11 @@ module WyzxRename
     @type = self::TYPE[suffix.downcase]
 
     new_filename = "#{assemble_new_filename}#{suffix.downcase}"
-    newdir = File.join "book_#{@book}", "unit_#{@unit}", @type
+    newdir = File.join h[:out_dir], "book_#{@book}", "unit_#{@unit}", @type
 
     mkdir_if_not_exist(newdir)
     copy_to_new_folder(File.join(@in_dir, @orig_filename), (File.join newdir, new_filename))
+    @data[idx][:new_name] = new_filename
   end
 
   # 清理csv中的字符串
@@ -220,7 +245,7 @@ module WyzxRename
   #       >> a.drop_while(&:!)
   #       => ["ab"]
   def assemble_new_filename
-    arr = [@book, @unit, @section, @subsection,
+    arr = ["b#{@book}", "u#{@unit}", @section, @subsection,
            @task, @activity_step, @question]
     s = arr.reverse
         .drop_while(&:!)
@@ -240,8 +265,8 @@ module WyzxRename
   end
 
   def copy_to_new_folder(o, n)
-    p "将文件 #{o} 复制到 #{n}"
-    FileUtils.cp o, n
+    # p "将文件 #{o} 复制到 #{n}"
+    # FileUtils.cp o, n
   end
 end
 
