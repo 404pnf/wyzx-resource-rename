@@ -71,26 +71,19 @@ module WyzxRename
     '.mp4' => 'video'
   }
 
-  # >> 'a'.ord
-  # => 97
-  # >> 96.chr
-  # => "`" # backtick
-  # >> '`'.next
-  # => "a"
-  # >> '`'.next.next
-  # => "b"
-
-  counter = lambda do
+  # 为了让counter从'a'开始。我们要找到'a'前面是哪个字符。
+  #     >> 'a'.ord
+  #     => 97
+  #     >> 96.chr
+  #     => "`" # backtick
+  #     >> '`'.next
+  #     => "a"
+  #     >> '`'.next.next
+  #     => "b"
+  COUNTER = lambda do
     id = '`'
     -> { id = id.next }
-  end.call
-
-  # 因为有些小题有可能有很多很多需要递增命名的文件。
-  # 因此不能采取之前的直接写hash字面量的方法。
-  # (1..26).zip('a'..'z').to_h
-  # NUM2ID 中    不用小写 l 因为和 1 太像了
-  NUM2ID = (1..100).to_a.map { |e| [e, counter.call] }.to_h
-  p NUM2ID
+  end
 
   module_function
 
@@ -165,17 +158,11 @@ module WyzxRename
     #
     # 这里还是应该修改为reduce。
     with_id = extra.each do |_, v|
-      v.each_with_index do |e, i|
-        e[:extra_id] = self::NUM2ID[i + 1] # 从1开始的
+      c = (self::COUNTER).call
+      v.each do |e|
+        e[:extra_id] = c.call
       end
     end
-
-    # with_id = extra.each_with_object({}) do |(k, v), o|
-    #   vv = v.map.with_index do |e, i|
-    #     e[:extra_id] = self::NUM2ID[i + 1] # 从1开始的
-    #   end
-    #   o[k] = v
-    # end
 
     db = dd.merge(with_id)
          .values
@@ -183,8 +170,6 @@ module WyzxRename
     puts db.size if @debug
     db
   end
-
-
 
   def find_missing_files(a)
     missing_files = a.map { |e | [File.exist?(e), e] }
