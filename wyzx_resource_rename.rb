@@ -88,14 +88,18 @@ module WyzxRename
     orig_files = data.map { |e| File.join e[:in_dir], e[:orig_filename] }
     exit if find_missing_files(orig_files) || check_suffix(orig_files)
     @data = data.dup
-    data.each_with_index { |e, i| go e, i}
+    data.each_with_index { |e, i| go e, i }
     puts "\nDone. Check #{out_dir} directory.\n\n"
-    p @data.first.keys
-    CSV.open("rename-#{Time.now.strftime("%Y-%m-%d")}.csv", "w", headers: @data.first.keys, force_quotes: true) do |csv|
-        @data.each do |h|
-          csv << h.delete_if { |k| [:extra_id, :in_dir, :out_dir].member? k }.values
-        end
+    options = { headers: @data.first.keys,
+                force_quotes: true,
+                write_headers: true
+              }
+    CSV.open("rename-#{Time.now.strftime('%Y-%m-%d')}.csv", 'w', options) do |c|
+      @data.each do |h|
+        hh = h.delete_if { |k| [:extra_id, :in_dir, :out_dir].member? k }
+        c << hh.values
       end
+    end
   end
 
   def add_input_output_dir(d, in_dir, out_dir)
@@ -265,8 +269,8 @@ module WyzxRename
   end
 
   def copy_to_new_folder(o, n)
-    # p "将文件 #{o} 复制到 #{n}"
-    # FileUtils.cp o, n
+    p "COPY FILE #{o} TO #{n}"
+    FileUtils.cp o, n
   end
 end
 
