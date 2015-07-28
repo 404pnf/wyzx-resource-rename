@@ -70,10 +70,27 @@ module WyzxRename
     '.mp3' => 'audio',
     '.mp4' => 'video'
   }
+
+  # >> 'a'.ord
+  # => 97
+  # >> 96.chr
+  # => "`" # backtick
+  # >> '`'.next
+  # => "a"
+  # >> '`'.next.next
+  # => "b"
+
+  counter = lambda do
+    id = '`'
+    -> { id = id.next }
+  end.call
+
+  # 因为有些小题有可能有很多很多需要递增命名的文件。
+  # 因此不能采取之前的直接写hash字面量的方法。
+  # (1..26).zip('a'..'z').to_h
   # NUM2ID 中    不用小写 l 因为和 1 太像了
-  NUM2ID = [[1, 'a'], [2, 'b'], [3, 'c'], [4, 'd'],
-            [5, 'e'], [6, 'f'], [7, 'g'], [8, 'h'],
-            [9, 'i'], [10, 'j'], [11, 'k'], [12, 'm'], [13, 'n']].to_h
+  NUM2ID = (1..100).to_a.map { |e| [e, counter.call] }.to_h
+  p NUM2ID
 
   module_function
 
@@ -166,6 +183,8 @@ module WyzxRename
     puts db.size if @debug
     db
   end
+
+
 
   def find_missing_files(a)
     missing_files = a.map { |e | [File.exist?(e), e] }
