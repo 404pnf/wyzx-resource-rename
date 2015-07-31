@@ -90,7 +90,7 @@ module WyzxRename
   # 默认的converters: numeric 我们要的就是字符而不是数字
   # 将in_dir和out_dir也放到数据中，方便后面使用。
   def main(csv, in_dir, out_dir)
-    puts "\nInput dir is #{in_dir}. Output dir is #{out_dir}\n\n"
+    puts "\nInput dir is <<#{in_dir}>>. Output dir is <<#{out_dir}>>\n\n"
     d = CSV.table(csv, converters: nil).map(&:to_h)
     puts d[0].keys if @debug
     d1 = add_input_output_dir d, in_dir, out_dir
@@ -100,13 +100,13 @@ module WyzxRename
     @data = data.dup
     data.each_with_index { |e, i| go e, i }
     puts "\nDone. Check #{out_dir} directory.\n\n"
-    options = { headers: @data.first.keys,
+    options = { headers: @data.first.keys.delete_if { |k| [:extra_id, :out_dir, :in_dir].member? k },
                 force_quotes: true,
                 write_headers: true
               }
     CSV.open("rename-#{Time.now.strftime('%Y-%m-%d')}.csv", 'w', options) do |c|
       @data.each do |h|
-        hh = h.delete_if { |k| [:extra_id, :in_dir, :out_dir].member? k }
+        hh = h.delete_if { |k| [:extra_id, :out_dir, :in_dir].member? k }
         c << hh.values
       end
     end
@@ -233,6 +233,7 @@ module WyzxRename
     mkdir_if_not_exist(newdir)
     copy_to_new_folder(File.join(@in_dir, @orig_filename), (File.join newdir, new_filename))
     @data[idx][:new_name] = new_filename
+    @data[idx][:new_dir] = newdir
   end
 
   # 清理csv中的字符串
