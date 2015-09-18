@@ -1,3 +1,5 @@
+#!/usr/bin/env ruby
+
 # # 使用方法
 #
 #   ruby script.rb csv文件 输入文件夹 输出文件夹
@@ -63,6 +65,30 @@ require 'FileUtils'
 # namespace
 module WyzxRename
   @debug = false
+  @verbose = true
+  USAGE = <<-EOF
+    简单说明使用方法：
+
+    1. 请将csv文件命名为rename.csv
+    2. 将要重命名的文件全部放在 in 文件夹内
+    3. 双击 rename.rb
+
+    详细说明
+
+    # 使用说明
+
+    1. 打开example_rename.csv文件。
+    2. 删除之前的数据，按要求填入新数据。
+    3. 复制 example_rename.csv 到 rename.csv，覆盖之前的rename.csv。
+    4. 双击 rename.rb
+    5. 如果有问题，屏幕会提示问题出现在哪里。请做相应修改。
+    6. 如果一切正常，你回看到 Everything is OK!. Find your new files at << out >> directory.
+    6. 还是搞不定，联系 9679 。请发问题截图。
+
+    完整命令行参数：ruby csv文件名.csv 输入文件夹 输出文件夹
+
+  EOF
+
   TYPE = {
     '.jpg' => 'image',
     '.jpeg' => 'image',
@@ -274,9 +300,13 @@ module WyzxRename
   end
 
   def copy_to_new_folder(o, n)
-    p "COPY FILE #{o} TO #{n}"
+    p "COPY FILE #{o} TO #{n}" if @verbose
     FileUtils.cp o, n
   end
 end
 
-WyzxRename.main ARGV[0] || 'rename.csv', ARGV[1] || 'in', ARGV[2] || 'out'
+if ARGV[0] == 'help'
+  puts WyzxRename::USAGE
+else
+  WyzxRename.main ARGV[0] || 'rename.csv', ARGV[1] || 'in', ARGV[2] || 'out'
+end
